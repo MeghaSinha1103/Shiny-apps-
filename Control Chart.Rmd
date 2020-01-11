@@ -1,0 +1,216 @@
+---
+title: "Control Charts"
+output: html_notebook
+---
+## CONTROL CHARTS FOR MONITOR.CSV DATASET
+
+ In this report our aim is to monitor the data given to us in order to study how the process changes over time with the help of control chart. A control chart, has a central line for average and an upper line for upper limit whereas lower line for the lower limit. We are trying to anser the below three questions with the help of our control charts-
+ 1) Is the memory usage of the server in control with time
+ 2) Is the prediction time of the model in control
+ 3) Is the stream of prediction in control
+
+#### Preparing the data for control chart. Adding column Indices which assigns days into groups
+##### Importing Required Libraries and reading the csv file.
+
+```{r}
+library(lubridate)
+library(sparklyr)
+library(dplyr)
+library(qicharts2)
+library(lessR)
+dfy <- read.csv("C:/Users/MEGHA/Desktop/DSI/Assignment4/monitor.csv")
+```
+
+##### Mutating with the column Date which gives only date from the timestamp column.
+
+```{r}
+dfy <- mutate(dfy, Date = date(dfy$Timestamp))
+```
+
+##### Making ID Column
+
+```{r}
+ID <- c(rep("ID1",10000))
+dfy <- mutate(dfy, ID = ID)
+```
+
+##### Generating Indices for the Date column
+```{r}
+my_index <- function(date) { c(1,1+cumsum(diff(dfy$Date)!=0)) }
+dfy$Indices <- do.call(c,tapply(dfy$Date, dfy$ID, my_index))
+```
+
+##### Removing unnecessary variables
+```{r}
+dfy <- dfy[,-c(5,6)]
+```
+
+### Control Charts for Process Memory
+
+#### Run chart for Process Memory
+```{r}
+pr <- qicharts2::qic(x = dfy$Indices, y = ProcessMemory, data = dfy, chart = "run", freeze = 20)
+plot(pr)
+```
+
+```{r}
+summary(pr)
+```
+
+From the above run chart and summary we can draw following conclusion-
+1) longest.run is greater than longest.run.max (62>10) 
+2) ncrossing is less than minimum value of ncrossings (9<37)
+3) runs.signal has flag 1 which indicates the process is out of control
+##### Thus we can say according to run chart the process Memory is out of control
+
+##### Making X Bar chart using first 20 Days
+```{r}
+pr <- qicharts2::qic(x = dfy$Indices, y = ProcessMemory, data = dfy, chart = "xbar", freeze = 20)
+plot(pr)
+```
+##### Summary for XBar Chart for Process Memory
+```{r}
+summary(pr)
+```
+
+#### As we can see from the above chart:
+#### The memory usage of the server is not in control as it has exceeded the upper limit with time
+
+1) As we have longest.run > longest.run.max (62 > 10) we have problem in our memory usage of the server as “run” is referred to as a number of process points that are consecutively above or below the mean line.
+
+2) In the above summary we can see, n.crossings < n.crossings.min (11 < 37)
+A “crossing” is when the process line crosses the mean line. As only 11 times the graph is crossing the mean line we have a problem in this chart
+
+3) The column called runs.signal is a 0/1 flag to indicate that one of the above rules have been breached. It is set to 1 as the above two rules are breached
+
+4) The sigma.signal gives us the count of breaches of the upper and lower control limits which is 54.
+
+#### Thus the memory usage of the server is not “in-control” with respect to the xbar chart.
+
+Making S Bar chart using first 20 Days
+```{r}
+p <- qicharts2::qic(x = dfy$Indices, y = ProcessMemory, data = dfy, chart = "s", freeze = 20)
+plot(p)
+```
+
+##### Summary for S chart for Process Memory is as below
+```{r}
+summary(p)
+```
+
+In the above S-chart summary we can see that the run.signal and sigma.signal, both are 0 which means the memory usage process is in control according to the S chart.
+
+#### However, as Xbar chart and run chart is out of control, the process overall can be declared as out of control.
+
+### Control Charts for Prediction
+##### Run chart for prediction
+```{r}
+pr1 <- qicharts2::qic(x = dfy$Indices, y = Prediction, data = dfy, chart = "run", freeze = 20)
+plot(pr1)
+```
+```{r}
+summary(pr1)
+```
+According to the run chart for predictions-
+1) longest.run is greater than longest.run.max which is a problem
+2) n.crossings is less than n.crossing.min which again is a problem
+3) runs.signal is set to 1 which indicates that the process is not under control
+
+###### Overal predictions process is out of control according to the run chart
+##### X bar chart for Prediction using first 20 Days of data to decide control limits.
+```{r}
+pr1 <- qicharts2::qic(x = dfy$Indices, y = Prediction, data = dfy, chart = "xbar", freeze = 20)
+plot(pr1)
+```
+##### Summary for X bar chart for Prediction 
+```{r}
+summary(pr1)
+```
+
+In this case we see xbar chart for prediction. From above chart we can draw following conclusions:
+1) As we have longest.run > longest.run.max (42 > 10) we have problem in our predictions as “run” is referred to as a number of process points that are consecutively above or below the mean line.
+
+2) In the above summary we can see, n.crossings < n.crossings.min (29 < 37)
+A “crossing” is when the process line crosses the mean line. As only 29 times the graph is crossing the mean line we have a problem in this chart.
+
+3) The column called runs.signal is a 0/1 flag to indicate that one of the above rules have been breached. It is set to 1 as the above two rules are breached
+
+4) The sigma.signal gives us the count of breaches of the upper and lower control limits which is 31. 
+
+#### Thus the predictions are not “in-control” with respect to the xbar chart.
+
+##### s chart for Prediction using first 20 Days of data to decide control limits.
+```{r}
+pr2 <- qicharts2::qic(x = dfy$Indices, y = Prediction, data = dfy, chart = "s", freeze = 20)
+plot(pr2)
+```
+
+##### Summary of s chart for Predictions
+```{r}
+summary(pr2)
+```
+
+
+In the above S-chart summary we can see that the run.signal is 1 and sigma.signal is 0 which means the predictions is not in control according to the S chart. longest.run is greater than longest.run.max which is (27 > 10).
+
+#### As Xbar chart,  S chart and run charts are out of control, the prediction process overall can be declared as out of control.
+
+### Control Charts for Prediction Time
+##### Run chart for Prediction Time
+```{r}
+pr3 <- qicharts2::qic(x = dfy$Indices, y = PredictionTimeMS, data = dfy, chart = "run", freeze = 20)
+plot(pr3)
+```
+```{r}
+summary(pr3)
+```
+1) From the above chart we see that the longest.run is less than longest.run.max which is under control
+2) n.crossings is greater than n.crossings.min which is again under control
+3) runs.signal also shows that the prediction time is under control
+
+##### Hence according to the run chart prediction time process is under control.
+
+##### XBAR chart for Prediction Time
+```{r}
+pr3 <- qicharts2::qic(x = dfy$Indices, y = PredictionTimeMS, data = dfy, chart = "xbar", freeze = 20)
+plot(pr3)
+```
+##### Summary of Prediction time for xbar chart
+```{r}
+summary(pr3)
+```
+
+In this case we see xbar chart for prediction time. From above chart we can draw following conclusions:
+1) Here longest.run and longest.run.max are same.
+
+2) In the above summary we can see, n.crossings > n.crossings.min (46 > 37) Here ncrossings are greater than the minimum value.
+
+3) The column called runs.signal is a 0/1 flag to indicate that one of the above rules have been breached. It is set to 0 as the above two rules are not breached
+
+4) The sigma.signal gives us the count of breaches of the upper and the lower control limits which is 4. In this case, there are four breaches in the upper limit.
+
+##### Thus Xbar is breached here as number of breaches are 4 according to sigma.signal. Hence prediction time is not under control.
+
+##### s chart for Prediction Time 
+```{r}
+pr4 <- qicharts2::qic(x = dfy$Indices, y = PredictionTimeMS, data = dfy, chart = "s", freeze = 20)
+plot(pr4)
+```
+
+##### Summary for s chart for prediction time 
+```{r}
+summary(pr4)
+```
+
+In this case we see S chart for prediction time. From above chart we can draw following conclusions:
+1) Here longest.run is greater than longest.run.max (46 > 10) thus prediction time is not under control.
+
+2) In the above summary we can see, n.crossings < n.crossings.min (23 < 37), this again shows prediction time is not under control.
+
+3) The column called runs.signal is a 0/1 flag to indicate that one of the above rules have been breached. It is set to 1 as the above two rules are breached.
+
+4) The sigma.signal gives us the count of breaches of the upper and lower control limits which is 11. 
+
+##### Thus s chart is breached here as number of breaches are 11 according to sigma.signal. Hence prediction time is not under control.
+
+#### In this case according to both xbar chart and the S chart, we can see that prediction time is not under control. However, run chart shows that prediction time is under control. But overal we can say that prediction time is not under control.
